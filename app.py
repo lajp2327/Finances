@@ -26,17 +26,15 @@ def configure_ai():
     try:
         genai.configure(api_key=GOOGLE_API_KEY)
         
-        # Intentar buscar modelos disponibles
         available_models = []
         try:
             for m in genai.list_models():
                 if 'generateContent' in m.supported_generation_methods:
                     available_models.append(m.name)
         except:
-            pass # Si falla listar, usamos fallback
+            pass 
         
-        # Selección de modelo por prioridad
-        target_model = "models/gemini-pro" # Fallback seguro
+        target_model = "models/gemini-pro"
         for m in available_models:
             if "gemini-2.5-flash" in m:
                 target_model = m
@@ -81,6 +79,7 @@ class TitanGemini:
         if not AI_AVAILABLE:
             return "Otros", "General"
         
+        # OJO: Aquí usamos doble llave {{ }} para que Python no se confunda
         prompt = f"""
         Actúa como contador. Tengo un gasto: '{concept}'.
         Categorías disponibles: {', '.join(self.categories)}.
@@ -107,6 +106,7 @@ class TitanGemini:
 
         data_context = self.df[["Fecha", "Concepto", "Categoria", "Monto", "Metodo"]].to_csv(index=False)
         
+        # AQUÍ ES DONDE SOLÍA FALLAR: Aseguramos el cierre de comillas
         prompt = f"""
         Eres TITAN, analista financiero.
         Datos CSV:
@@ -115,21 +115,24 @@ class TitanGemini:
         Pregunta usuario: "{user_question}"
         
         Responde breve, directo y en Markdown.
-        ""
+        """
         try:
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:
             return f"Error: {e}"
 
-# --- 4. GESTIÓN DE USUARIOS ---
+# --- 4. GESTIÓN DE USUARIOS Y DATOS ---
 def init_system():
+    # Inicializar Base de Datos
     if not os.path.exists(DB_FILE):
         df = pd.DataFrame(columns=["User", "Fecha", "Concepto", "Categoria", "Subcategoria", "Monto", "Metodo"])
         df.to_csv(DB_FILE, index=False)
     
+    # Inicializar Usuarios (Esta es la línea que daba error antes)
     if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'w') as f: json.dump({}, f)
+        with open(USERS_FILE, 'w') as f:
+            json.dump({}, f)
 
 def load_users():
     with open(USERS_FILE, 'r') as f: return json.load(f)
@@ -156,7 +159,7 @@ def update_user_config(username, new_config):
         users[username]["config"] = new_config
         with open(USERS_FILE, 'w') as f: json.dump(users, f)
 
-# --- 5. GESTIÓN DE DATOS (BLINDADA) ---
+# --- 5. DATA MANAGER BLINDADO ---
 def load_transactions(username):
     expected_cols = ["User", "Fecha", "Concepto", "Categoria", "Subcategoria", "Monto", "Metodo"]
     try:
@@ -166,7 +169,7 @@ def load_transactions(username):
     except:
         df = pd.DataFrame(columns=expected_cols)
 
-    # --- CORRECCIÓN DE FECHAS CRÍTICA ---
+    # Convertir fecha sin errores
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce')
 
     if "User" in df.columns:
@@ -270,7 +273,6 @@ def main_app():
     # --- CARGA DE DATOS ---
     df_all = load_transactions(user)
     
-    # Filtro Temporal (Manejo seguro de fechas vacías)
     if not df_all.empty:
         df = df_all[
             (df_all["Fecha"].dt.year == sel_year) & 
