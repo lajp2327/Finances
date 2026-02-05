@@ -281,9 +281,38 @@ def main_app():
             st.rerun()
 
     # --- DATOS ---
-    df_all = load_transactions(user)
-    df = df_all[(df_all["Fecha"].dt.year == sel_year) & (df_all["Fecha"].dt.month == month_idx)].copy()
+# --- 4. DATA MANAGER (CORREGIDO Y BLINDADO) ---
+def load_transactions(username):
+    # Definimos las columnas esperadas para evitar errores si el CSV está incompleto
+    expected_cols = ["User", "Fecha", "Concepto", "Categoria", "Subcategoria", "Monto", "Metodo"]
     
+    try:
+        # Intentamos leer el archivo
+        df = pd.read_csv(DB_FILE)
+        
+        # Si faltan columnas (ej. versiones viejas), las creamos vacías
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = None
+                
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        # Si no existe o está vacío, creamos el esqueleto
+        df = pd.DataFrame(columns=expected_cols)
+
+    # --- CORRECCIÓN CRÍTICA ---
+    # Forzamos que la columna Fecha SEA FECHA, sin importar qué pase.
+    # errors='coerce' convierte datos basura en NaT (Not a Time) para que no truene.
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce')
+
+    # Filtramos por usuario
+    if "User" in df.columns:
+        user_df = df[df["User"] == username].copy()
+    else:
+        # Si por alguna razón crítica no hay columna user, devolvemos vacío
+        user_df = pd.DataFrame(columns=expected_cols)
+        user_df["Fecha"] = pd.to_datetime(user_df["Fecha"])
+
+    return user_df
     # --- DASHBOARD ---
     st.markdown(f"## 📊 TITAN Dashboard: {sel_month} {sel_year}")
     
