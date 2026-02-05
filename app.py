@@ -23,15 +23,41 @@ st.set_page_config(
 # Lo ideal en producción es usar st.secrets.
 GOOGLE_API_KEY = "AIzaSyB9_HSrUTq9SacuCS5iaBh87VNLwLu9OLs"
 
-try:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    # Usamos Gemini 1.5 Flash por ser rápido y eficiente para datos
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    AI_AVAILABLE = True
-except Exception as e:
-    st.error(f"Error configurando Gemini AI: {e}")
-    AI_AVAILABLE = False
+# --- 2. MOTOR DE IA (CONFIGURACIÓN ROBUSTA) ---
+# Intentamos conectar con el modelo más avanzado disponible
+def configure_ai():
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        
+        # 1. Listamos los modelos que TU cuenta puede ver
+        available_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+        
+        # 2. Buscamos el mejor candidato automáticamente
+        # Orden de preferencia: 2.5 -> 2.0 -> 1.5 -> Pro
+        target_model = "models/gemini-pro" # Fallback seguro
+        
+        # Buscamos si existe alguno de la serie 2.5 o 2.0 Flash
+        for m in available_models:
+            if "gemini-2.5-flash" in m:
+                target_model = m
+                break
+            elif "gemini-2.0-flash" in m:
+                target_model = m
+                break
+            elif "gemini-1.5-flash" in m:
+                target_model = m
+        
+        print(f"Modelo seleccionado: {target_model}") # Para debug en consola
+        return genai.GenerativeModel(target_model), target_model, True
 
+    except Exception as e:
+        return None, str(e), False
+
+# Inicializamos
+model, model_name, AI_AVAILABLE = configure_ai()
 # --- ESTILOS ---
 st.markdown("""
     <style>
@@ -109,7 +135,7 @@ class TitanGemini:
             response = model.generate_content(prompt)
             return response.text
         except Exception as e:
-            return f"Error en el análisis: {e}"
+            return f"Error en el análisis: {e}"""
 
 # --- 3. SISTEMA DE USUARIOS ---
 def init_system():
@@ -212,9 +238,9 @@ def main_app():
     with st.sidebar:
         st.title(f"👤 {user.upper()}")
         if AI_AVAILABLE:
-            st.success("🟢 Gemini AI: Conectado")
+            st.success(f"🟢 Conectado a: {model_name.replace('models/', '')}")
         else:
-            st.error("🔴 AI: Desconectado")
+            st.error(f"🔴 AI Error: {model_name}")
             
         # Filtros
         today = datetime.now()
