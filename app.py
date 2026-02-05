@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # --- CLAVE API ---
-GOOGLE_API_KEY = "AIzaSyB9_HSrUTq9SacuCS5iaBh87VNLwLu9OLs"
+GOOGLE_API_KEY = "AIzaSyCNzzi3eow6_DGhqRz7vtWVrCe2I0BnxrY"
 
 # --- 2. MOTOR DE IA (CONFIGURACIÓN ROBUSTA) ---
 def configure_ai():
